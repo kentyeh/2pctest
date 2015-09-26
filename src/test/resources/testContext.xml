@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+       http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd">
+
+    <!--support JSR-250-->
+    <bean class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor"/>
+    <bean name="server1" class="org.h2.tools.Server" init-method="start" destroy-method="stop">
+        <constructor-arg>
+            <bean class="org.h2.server.TcpServer"/>
+        </constructor-arg>
+        <constructor-arg>
+            <array value-type="java.lang.String">
+                <value>-tcp</value>
+                <value>-tcpAllowOthers</value>
+                <value>-tcpDaemon</value>
+                <value>-tcpPort</value>
+                <value>9091</value>
+                <value>-baseDir</value>
+                <value>${project.build.directory}</value>
+            </array>
+        </constructor-arg>
+    </bean>
+    <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean" depends-on="server1">
+        <property name="targetObject">
+            <bean class="org.h2.tools.RunScript"/>
+        </property>
+        <property name="targetMethod" value="runTool"/>
+        <property name="arguments">
+            <array value-type="java.lang.String">
+                <value>-url</value>
+                <value>jdbc:h2:tcp://127.0.0.1:9091/${project.build.directory}/${project.artifactId}1;AUTO_SERVER=TRUE</value>
+                <value>-user</value>
+                <value>sa</value>
+                <value>-password</value>
+                <value>${project.artifactId}</value>
+                <value>-script</value>
+                <value>${project.build.testOutputDirectory}/test-data.sql</value>
+            </array>
+        </property>
+    </bean>
+    
+    <util:map id="appProperies" map-class="java.util.HashMap" key-type="java.lang.String" value-type="java.lang.String">
+        <entry key="targetFolder" value="${project.build.directory}" />
+    </util:map> 
+    
+    <bean name="server2" class="org.h2.tools.Server" init-method="start" destroy-method="stop">
+        <constructor-arg>
+            <bean class="org.h2.server.TcpServer"/>
+        </constructor-arg>
+        <constructor-arg>
+            <array value-type="java.lang.String">
+                <value>-tcp</value>
+                <value>-tcpAllowOthers</value>
+                <value>-tcpDaemon</value>
+                <value>-tcpPort</value>
+                <value>9092</value>
+                <value>-baseDir</value>
+                <value>${project.build.directory}</value>
+            </array>
+        </constructor-arg>
+    </bean>
+    <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean" depends-on="server2">
+        <property name="targetObject">
+            <bean class="org.h2.tools.RunScript"/>
+        </property>
+        <property name="targetMethod" value="runTool"/>
+        <property name="arguments">
+            <array value-type="java.lang.String">
+                <value>-url</value>
+                <value>jdbc:h2:tcp://127.0.0.1:9092/${project.build.directory}/${project.artifactId}2;AUTO_SERVER=TRUE</value>
+                <value>-user</value>
+                <value>sa</value>
+                <value>-password</value>
+                <value>${project.artifactId}</value>
+                <value>-script</value>
+                <value>${project.build.testOutputDirectory}/test-data.sql</value>
+            </array>
+        </property>
+    </bean>
+    
+    <bean id="dataSource1" class="org.h2.jdbcx.JdbcDataSource" >
+        <property name="url" value="jdbc:h2:tcp://127.0.0.1:9091/${project.build.directory}/${project.artifactId}1;AUTO_SERVER=TRUE;TRACE_LEVEL_FILE=3;TRACE_LEVEL_SYSTEM_OUT=3"/>
+        <property name="user" value="sa"/>
+        <property name="password" value="${project.artifactId}"/>
+    </bean>
+    <bean id="dataSource2" class="org.h2.jdbcx.JdbcDataSource" >
+        <property name="url" value="jdbc:h2:tcp://127.0.0.1:9092/${project.build.directory}/${project.artifactId}2;AUTO_SERVER=TRUE;TRACE_LEVEL_FILE=3;TRACE_LEVEL_SYSTEM_OUT=3"/>
+        <property name="user" value="sa"/>
+        <property name="password" value="${project.artifactId}"/>
+    </bean>
+    
+    <bean id="userTransactionService" class="com.atomikos.icatch.config.UserTransactionServiceImp"  
+          init-method="init" destroy-method="shutdownForce"> 
+        <constructor-arg> 
+            <props> 
+                <prop key="com.atomikos.icatch.service"> 
+                    com.atomikos.icatch.standalone.UserTransactionServiceFactory 
+                </prop> 
+                <prop key="com.atomikos.icatch.enable_logging">falae</prop>
+                <prop key="com.atomikos.icatch.output_dir">${project.build.directory}/logs/</prop>
+                <prop key="com.atomikos.icatch.tm_unique_name">userTransactionService</prop>
+            </props> 
+        </constructor-arg> 
+    </bean> 
+    <bean id="transactionManager" class="com.atomikos.icatch.jta.UserTransactionManager" init-method="init" destroy-method="close"
+          p:forceShutdown="false" p:startupTransactionService="false" depends-on="userTransactionService" />
+</beans>
